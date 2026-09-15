@@ -21,7 +21,6 @@
         <nav class="nav-links">
           <a href="#features">Features</a>
           <a href="#how-it-works">How It Works</a>
-          <a href="#api">API</a>
           <a href="#pricing">Pricing</a>
         </nav>
 
@@ -262,55 +261,6 @@
         </div>
       </section>
 
-      <!-- API Integration Section -->
-      <section id="api" class="api-section">
-        <div class="section-header">
-          <div class="section-tag">Developer Friendly</div>
-          <h2 class="section-title">Integrate img2url in your stack</h2>
-          <p class="section-subtitle">Simple REST API to upload images programmatically from any backend or script.</p>
-        </div>
-
-        <div class="code-container">
-          <div class="code-tabs">
-            <button
-              v-for="lang in ['cURL', 'JavaScript', 'Python']"
-              :key="lang"
-              class="code-tab"
-              :class="{ active: activeTab === lang }"
-              @click="activeTab = lang"
-            >
-              {{ lang }}
-            </button>
-          </div>
-
-          <div class="code-block">
-            <pre v-if="activeTab === 'cURL'"><code>curl -X POST https://api.img2url.dev/v1/upload \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -F "file=@/path/to/image.png"</code></pre>
-
-            <pre v-if="activeTab === 'JavaScript'"><code>const formData = new FormData();
-formData.append('file', imageFile);
-
-const response = await fetch('https://api.img2url.dev/v1/upload', {
-  method: 'POST',
-  headers: { 'Authorization': 'Bearer YOUR_API_KEY' },
-  body: formData
-});
-
-const data = await response.json();
-console.log('Public URL:', data.url);</code></pre>
-
-            <pre v-if="activeTab === 'Python'"><code>import requests
-
-files = {'file': open('image.png', 'rb')}
-headers = {'Authorization': 'Bearer YOUR_API_KEY'}
-
-response = requests.post('https://api.img2url.dev/v1/upload', files=files, headers=headers)
-print('Public URL:', response.json()['url'])</code></pre>
-          </div>
-        </div>
-      </section>
-
       <!-- CTA Section -->
       <section class="cta-section">
         <div class="cta-card">
@@ -336,7 +286,6 @@ print('Public URL:', response.json()['url'])</code></pre>
             <h4>Product</h4>
             <a href="#features">Features</a>
             <a href="#how-it-works">How It Works</a>
-            <a href="#api">API Docs</a>
             <a href="#pricing">Pricing</a>
           </div>
 
@@ -370,7 +319,6 @@ const fileName = ref('');
 const fileSpecs = ref('');
 const generatedUrl = ref('');
 const copiedType = ref('');
-const activeTab = ref('cURL');
 const fileInput = ref(null);
 
 // Trigger file picker
@@ -1042,7 +990,7 @@ body {
 }
 
 /* Features Section */
-.features-section, .how-section, .api-section {
+.features-section, .how-section {
   max-width: 1100px;
   margin: 6rem auto;
   padding: 0 1.5rem;
@@ -1148,51 +1096,6 @@ body {
 .step-card p {
   color: var(--text-muted);
   font-size: 0.92rem;
-}
-
-/* API Section */
-.code-container {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 14px;
-  overflow: hidden;
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.code-tabs {
-  display: flex;
-  background: rgba(0, 0, 0, 0.4);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.code-tab {
-  padding: 0.8rem 1.5rem;
-  background: transparent;
-  border: none;
-  color: var(--text-dim);
-  font-weight: 600;
-  font-size: 0.88rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.code-tab.active {
-  color: var(--primary-green);
-  border-bottom: 2px solid var(--primary-green);
-  background: rgba(34, 197, 94, 0.05);
-}
-
-.code-block {
-  padding: 1.5rem;
-  overflow-x: auto;
-}
-
-.code-block pre {
-  font-family: monospace;
-  font-size: 0.9rem;
-  color: #e4e4e7;
-  line-height: 1.6;
 }
 
 /* CTA Section */
