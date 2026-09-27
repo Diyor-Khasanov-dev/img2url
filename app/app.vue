@@ -25,13 +25,30 @@
         </nav>
 
         <div class="nav-actions">
-          <div class="status-badge">
-            <span class="status-dot"></span>
-            Edge CDN Active
+          <div class="status-badge" :class="{ 'status-offline': !isBackendHealthy }">
+            <span class="status-dot" :class="{ 'dot-offline': !isBackendHealthy }"></span>
+            {{ isBackendHealthy ? 'Edge CDN Active' : 'Backend Connecting...' }}
           </div>
-          <a href="#upload-section" class="btn btn-primary btn-sm">
-            Upload Image
-          </a>
+
+          <!-- User Auth Navigation Actions -->
+          <div v-if="currentUser" class="user-menu-wrapper">
+            <button class="btn btn-secondary btn-sm user-menu-btn" @click="openProfileModal">
+              <span class="avatar-icon">{{ currentUser.fullName ? currentUser.fullName[0].toUpperCase() : 'U' }}</span>
+              <span class="user-name">{{ currentUser.fullName || currentUser.email }}</span>
+            </button>
+            <button class="btn btn-xs btn-outline-danger" @click="handleLogout" title="Logout">
+              Logout
+            </button>
+          </div>
+
+          <div v-else class="auth-buttons">
+            <button class="btn btn-secondary btn-sm" @click="openAuthModal('login')">
+              Log In
+            </button>
+            <button class="btn btn-primary btn-sm" @click="openAuthModal('register')">
+              Sign Up
+            </button>
+          </div>
         </div>
       </div>
     </header>
@@ -71,7 +88,13 @@
               @change="onFileSelected"
             />
 
-            <div v-if="!previewUrl" class="dropzone-content">
+            <!-- Loading Spinner Overlay when Uploading -->
+            <div v-if="isUploading" class="upload-loading-state">
+              <div class="spinner"></div>
+              <p class="loading-text">Uploading and generating edge link...</p>
+            </div>
+
+            <div v-else-if="!previewUrl" class="dropzone-content">
               <div class="upload-icon-wrapper">
                 <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -273,6 +296,147 @@
       </section>
     </main>
 
+    <!-- Profile Modal (View / Update Profile) -->
+    <div v-if="isProfileModalOpen" class="modal-backdrop" @click.self="closeProfileModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>User Profile Settings</h3>
+          <button class="close-btn" @click="closeProfileModal">&times;</button>
+        </div>
+
+        <p class="modal-subtitle">
+          Update your personal details or account password below.
+        </p>
+
+        <form @submit.prevent="handleProfileSubmit" class="auth-form">
+          <div class="form-group">
+            <label for="profileFullName">Full Name</label>
+            <input
+              id="profileFullName"
+              v-model="profileForm.fullName"
+              type="text"
+              placeholder="Full Name"
+              class="form-input"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="profileEmail">Email Address</label>
+            <input
+              id="profileEmail"
+              v-model="profileForm.email"
+              type="email"
+              placeholder="name@example.com"
+              class="form-input"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="profilePassword">New Password (leave blank to keep current)</label>
+            <input
+              id="profilePassword"
+              v-model="profileForm.password"
+              type="password"
+              placeholder="New password (min 6 chars)"
+              minlength="6"
+              class="form-input"
+            />
+          </div>
+
+          <div v-if="profileMessage" class="auth-success-msg">
+            ✓ {{ profileMessage }}
+          </div>
+
+          <div v-if="profileError" class="auth-error-msg">
+            ⚠️ {{ profileError }}
+          </div>
+
+          <div class="modal-actions-row">
+            <button type="button" class="btn btn-secondary" @click="closeProfileModal">
+              Cancel
+            </button>
+            <button type="submit" class="btn btn-primary" :disabled="isProfileSubmitting">
+              <span v-if="isProfileSubmitting" class="button-spinner"></span>
+              <span v-else>Save Changes</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Auth Modal (Login / Register) -->
+    <div v-if="isAuthModalOpen" class="modal-backdrop" @click.self="closeAuthModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>{{ authMode === 'login' ? 'Welcome Back' : 'Create an Account' }}</h3>
+          <button class="close-btn" @click="closeAuthModal">&times;</button>
+        </div>
+
+        <p class="modal-subtitle">
+          {{ authMode === 'login' ? 'Log in to manage your uploaded images and profile.' : 'Sign up to get permanent image hosting and JWT access.' }}
+        </p>
+
+        <form @submit.prevent="handleAuthSubmit" class="auth-form">
+          <div v-if="authMode === 'register'" class="form-group">
+            <label for="fullName">Full Name</label>
+            <input
+              id="fullName"
+              v-model="authForm.fullName"
+              type="text"
+              placeholder="Jane Doe"
+              required
+              class="form-input"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="email">Email Address</label>
+            <input
+              id="email"
+              v-model="authForm.email"
+              type="email"
+              placeholder="jane@example.com"
+              required
+              class="form-input"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="password">Password</label>
+            <input
+              id="password"
+              v-model="authForm.password"
+              type="password"
+              placeholder="••••••••"
+              required
+              minlength="6"
+              class="form-input"
+            />
+          </div>
+
+          <div v-if="authError" class="auth-error-msg">
+            ⚠️ {{ authError }}
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block" :disabled="isAuthSubmitting">
+            <span v-if="isAuthSubmitting" class="button-spinner"></span>
+            <span v-else>{{ authMode === 'login' ? 'Sign In' : 'Create Account' }}</span>
+          </button>
+        </form>
+
+        <div class="modal-footer">
+          <p v-if="authMode === 'login'">
+            Don't have an account?
+            <a href="#" @click.prevent="switchAuthMode('register')">Sign Up</a>
+          </p>
+          <p v-else>
+            Already have an account?
+            <a href="#" @click.prevent="switchAuthMode('login')">Log In</a>
+          </p>
+        </div>
+      </div>
+    </div>
+
     <!-- Footer -->
     <footer class="footer">
       <div class="footer-content">
@@ -301,8 +465,9 @@
 
       <div class="footer-bottom">
         <p>&copy; {{ new Date().getFullYear() }} img2url. All rights reserved.</p>
-        <div class="system-status">
-          <span class="status-dot"></span> All systems operational
+        <div class="system-status" :class="{ 'status-offline-text': !isBackendHealthy }">
+          <span class="status-dot" :class="{ 'dot-offline': !isBackendHealthy }"></span>
+          {{ isBackendHealthy ? 'All systems operational' : 'Reconnecting to backend...' }}
         </div>
       </div>
     </footer>
@@ -310,16 +475,251 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
+
+const API_BASE_URL = 'https://img2url-backend.onrender.com';
 
 // Reactive state
 const isDragging = ref(false);
+const isUploading = ref(false);
+const isBackendHealthy = ref(true);
 const previewUrl = ref('');
 const fileName = ref('');
 const fileSpecs = ref('');
 const generatedUrl = ref('');
 const copiedType = ref('');
+const uploadError = ref('');
 const fileInput = ref(null);
+
+// Auth & User State
+const currentUser = ref(null);
+const accessToken = ref('');
+const isAuthModalOpen = ref(false);
+const authMode = ref('login'); // 'login' | 'register'
+const isAuthSubmitting = ref(false);
+const authError = ref('');
+const authForm = ref({
+  fullName: '',
+  email: '',
+  password: ''
+});
+
+// Profile Modal State & Form
+const isProfileModalOpen = ref(false);
+const isProfileSubmitting = ref(false);
+const profileError = ref('');
+const profileMessage = ref('');
+const profileForm = ref({
+  fullName: '',
+  email: '',
+  password: ''
+});
+
+const openProfileModal = () => {
+  if (currentUser.value) {
+    profileForm.value = {
+      fullName: currentUser.value.fullName || '',
+      email: currentUser.value.email || '',
+      password: ''
+    };
+  }
+  profileError.value = '';
+  profileMessage.value = '';
+  isProfileModalOpen.value = true;
+};
+
+const closeProfileModal = () => {
+  isProfileModalOpen.value = false;
+  profileError.value = '';
+  profileMessage.value = '';
+};
+
+// Update user profile via PATCH /api/auth/me
+const handleProfileSubmit = async () => {
+  profileError.value = '';
+  profileMessage.value = '';
+  isProfileSubmitting.value = true;
+
+  try {
+    const payload = {};
+    if (profileForm.value.fullName) payload.fullName = profileForm.value.fullName;
+    if (profileForm.value.email) payload.email = profileForm.value.email;
+    if (profileForm.value.password) payload.password = profileForm.value.password;
+
+    const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken.value}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      const errMsg = Array.isArray(data.message) ? data.message.join(', ') : data.message || 'Failed to update profile.';
+      throw new Error(errMsg);
+    }
+
+    if (data.user) {
+      currentUser.value = data.user;
+    } else {
+      await fetchUserProfile();
+    }
+
+    profileMessage.value = data.message || 'Profile updated successfully!';
+    setTimeout(() => {
+      closeProfileModal();
+    }, 1500);
+  } catch (err) {
+    profileError.value = err.message;
+  } finally {
+    isProfileSubmitting.value = false;
+  }
+};
+
+// Format image URL helper (ensures https)
+const formatImageUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('http://')) {
+    return url.replace('http://', 'https://');
+  }
+  return url;
+};
+
+// Check backend health
+const checkBackendHealth = async () => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/`);
+    if (res.ok) {
+      isBackendHealthy.value = true;
+    } else {
+      isBackendHealthy.value = false;
+    }
+  } catch (err) {
+    isBackendHealthy.value = false;
+  }
+};
+
+// Load stored JWT token & current user on mounted
+onMounted(() => {
+  checkBackendHealth();
+  if (import.meta.client) {
+    const savedToken = localStorage.getItem('img2url_token');
+    if (savedToken) {
+      accessToken.value = savedToken;
+      fetchUserProfile();
+    }
+  }
+});
+
+// Auth Helper Functions
+const openAuthModal = (mode = 'login') => {
+  authMode.value = mode;
+  authError.value = '';
+  authForm.value = { fullName: '', email: '', password: '' };
+  isAuthModalOpen.value = true;
+};
+
+const closeAuthModal = () => {
+  isAuthModalOpen.value = false;
+  authError.value = '';
+};
+
+const switchAuthMode = (mode) => {
+  authMode.value = mode;
+  authError.value = '';
+};
+
+// Fetch current logged in user profile
+const fetchUserProfile = async () => {
+  if (!accessToken.value) return;
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken.value}`
+      }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      currentUser.value = data.user || data;
+    } else {
+      // Token invalid or expired
+      handleLogout();
+    }
+  } catch (err) {
+    console.error('Failed to fetch user profile:', err);
+  }
+};
+
+// Handle Authentication Form Submit (Login / Register)
+const handleAuthSubmit = async () => {
+  authError.value = '';
+  isAuthSubmitting.value = true;
+
+  try {
+    const endpoint = authMode.value === 'register' ? '/api/auth/register' : '/api/auth/login';
+    const payload = authMode.value === 'register'
+      ? { fullName: authForm.value.fullName, email: authForm.value.email, password: authForm.value.password }
+      : { email: authForm.value.email, password: authForm.value.password };
+
+    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      const errMsg = Array.isArray(data.message) ? data.message.join(', ') : data.message || 'Authentication failed.';
+      throw new Error(errMsg);
+    }
+
+    if (data.access_token) {
+      accessToken.value = data.access_token;
+      if (import.meta.client) {
+        localStorage.setItem('img2url_token', data.access_token);
+      }
+    }
+
+    if (data.user) {
+      currentUser.value = data.user;
+    } else {
+      await fetchUserProfile();
+    }
+
+    closeAuthModal();
+  } catch (err) {
+    authError.value = err.message;
+  } finally {
+    isAuthSubmitting.value = false;
+  }
+};
+
+// Handle Logout
+const handleLogout = async () => {
+  if (accessToken.value) {
+    try {
+      await fetch(`${API_BASE_URL}/api/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken.value}`
+        }
+      });
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+  }
+  accessToken.value = '';
+  currentUser.value = null;
+  if (import.meta.client) {
+    localStorage.removeItem('img2url_token');
+  }
+};
 
 // Trigger file picker
 const triggerFileInput = () => {
@@ -352,56 +752,81 @@ const onFileSelected = (event) => {
   }
 };
 
+// Upload image file to backend
+const uploadFileToBackend = async (file) => {
+  uploadError.value = '';
+  isUploading.value = true;
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch(`${API_BASE_URL}/img-deploy`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      const errMsg = Array.isArray(data.message) ? data.message.join(', ') : data.message || 'Failed to upload image.';
+      throw new Error(errMsg);
+    }
+
+    const finalUrl = formatImageUrl(data.url || data.link || data.imageUrl);
+    generatedUrl.value = finalUrl;
+    previewUrl.value = finalUrl;
+    fileName.value = data.originalname || file.name;
+    const sizeKb = ((data.size || file.size) / 1024).toFixed(1);
+    const mime = (data.mimetype || file.type || 'image/png').split('/')[1]?.toUpperCase() || 'IMAGE';
+    fileSpecs.value = `${sizeKb} KB • ${mime}`;
+  } catch (err) {
+    alert(`Upload Error: ${err.message}`);
+    uploadError.value = err.message;
+  } finally {
+    isUploading.value = false;
+  }
+};
+
 // File processing helper
-const processFile = (file) => {
+const processFile = async (file) => {
   if (!file.type.startsWith('image/')) {
     alert('Please select a valid image file (PNG, JPG, WEBP, SVG, GIF).');
     return;
   }
-
-  fileName.value = file.name;
-  const sizeKb = (file.size / 1024).toFixed(1);
-  fileSpecs.value = `${sizeKb} KB • ${file.type.split('/')[1].toUpperCase()}`;
-
-  // Read file locally as Data URL for preview
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    previewUrl.value = e.target.result;
-    // Generate clean mock CDN URL based on random unique hash
-    const randomHash = Math.random().toString(36).substring(2, 9);
-    const ext = file.name.split('.').pop() || 'webp';
-    generatedUrl.value = `https://cdn.img2url.dev/i/${randomHash}.${ext}`;
-  };
-  reader.readAsDataURL(file);
+  await uploadFileToBackend(file);
 };
 
-// Sample Images Loader
+// Sample Images Loader (Fetches sample image, converts to File, and uploads to backend)
 const sampleImages = {
   tech: {
     url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80',
-    name: 'cyber-avatar.png',
-    specs: '142.5 KB • PNG'
+    name: 'cyber-avatar.jpg',
+    type: 'image/jpeg'
   },
   landscape: {
     url: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80',
     name: 'mountain-view.jpg',
-    specs: '280.1 KB • JPG'
+    type: 'image/jpeg'
   },
   cyber: {
     url: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=600&q=80',
-    name: 'neon-city.webp',
-    specs: '98.4 KB • WEBP'
+    name: 'neon-city.jpg',
+    type: 'image/jpeg'
   }
 };
 
-const loadSampleImage = (type) => {
+const loadSampleImage = async (type) => {
   const sample = sampleImages[type] || sampleImages.tech;
-  previewUrl.value = sample.url;
-  fileName.value = sample.name;
-  fileSpecs.value = sample.specs;
-  const randomHash = Math.random().toString(36).substring(2, 9);
-  const ext = sample.name.split('.').pop();
-  generatedUrl.value = `https://cdn.img2url.dev/i/${randomHash}.${ext}`;
+  try {
+    isUploading.value = true;
+    const response = await fetch(sample.url);
+    const blob = await response.blob();
+    const file = new File([blob], sample.name, { type: sample.type });
+    await uploadFileToBackend(file);
+  } catch (err) {
+    alert(`Failed to load sample image: ${err.message}`);
+    isUploading.value = false;
+  }
 };
 
 // Reset upload area
@@ -610,6 +1035,265 @@ body {
   background-color: var(--primary-green);
   border-radius: 50%;
   box-shadow: 0 0 8px var(--primary-green);
+  transition: all 0.3s ease;
+}
+
+.status-dot.dot-offline {
+  background-color: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
+}
+
+.status-badge.status-offline {
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #f59e0b;
+}
+
+.system-status.status-offline-text {
+  color: #f59e0b;
+}
+
+/* Loading State for Uploading */
+.upload-loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 2rem 0;
+}
+
+.spinner {
+  width: 38px;
+  height: 38px;
+  border: 3px solid rgba(34, 197, 94, 0.2);
+  border-top-color: var(--primary-green);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-text {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+/* User Menu & Navigation Auth Styling */
+.user-menu-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.user-menu-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.avatar-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--primary-green);
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.user-name {
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.auth-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.btn-outline-danger {
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+}
+
+.btn-outline-danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+}
+
+/* Modals */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modal-card {
+  background: #121215;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 440px;
+  padding: 2rem;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  animation: modalFadeIn 0.25s ease-out;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header h3 {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.6rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.close-btn:hover {
+  color: var(--text-white);
+}
+
+.modal-subtitle {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.form-group label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.form-input {
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.65rem 0.85rem;
+  color: var(--text-white);
+  font-size: 0.92rem;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.form-input:focus {
+  border-color: var(--primary-green);
+}
+
+.auth-error-msg {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  padding: 0.6rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+}
+
+.auth-success-msg {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: var(--primary-green);
+  padding: 0.6rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+}
+
+.modal-actions-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.8rem;
+  margin-top: 0.5rem;
+}
+
+.btn-block {
+  width: 100%;
+  padding: 0.75rem;
+  margin-top: 0.4rem;
+}
+
+.modal-footer {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-color);
+  padding-top: 1rem;
+}
+
+.modal-footer a {
+  color: var(--primary-green);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.modal-footer a:hover {
+  text-decoration: underline;
+}
+
+.button-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(0, 0, 0, 0.3);
+  border-top-color: #000;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
 }
 
 /* Buttons */
